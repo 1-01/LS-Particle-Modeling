@@ -1,49 +1,43 @@
-
-%Flux calculation, and particles NOT conserved, taken out when they leave
-%the model
-%Measuring normalized flux of particles at x-gates downwind
-%Flux starts ~ 1, and falls to 0 as we go downwind
-%There is a weird peak above 1 at first xgate, not sure why
-
-%edit log:
-
-
-function ls_1_26_21_replot_with_aylordata()
-
-close all
-clear all
-beep on
+% 
+% Flux calculation, and particles NOT conserved, taken out when they leave
+% the model
+% Measuring normalized flux of particles at x-gates downwind
+% Flux starts ~ 1, and falls to 0 as we go downwind
+% There is a weird peak above 1 at first xgate, not sure why
+% 
+% edit log:
+% 06/15/21 - Add LaTeX to plot labels.
+%            Change 'Height/canopyheight' to 'z/h' to be more consistent
+%               with symbols used on x-axis.
+%            Abbreviate legend names and move them out of the plot so data
+%               aren't covered.
+%            Tidying up code (removing some harmless warnings like [a:b:c],
+%               placing Aylor's 6 experiments into 1 file, etc.)
+% 
+% 06/16/21 - Tidying
+% 
+% 06/17/21 - Remove the randn vector of values as computation time seemed
+%            to increase upon calling 'randn' each time (due to removing
+%            time required to find memory to store the random values)
+% 
+% 06/18/21 - 
+% 
+clear, close all
 tic
+%% Inputs
+experiment = 3; %input('Enter Experiment Number: ');
+runs = 5;       % run the experiment # times to get averages
 
-%% GET the experi
-exp = input('Enter Experiment Number: ');
-
-switch exp
-    case 1
-        [xmodel_upper ymodel_upper xexp_upper yexp_upper xmodel_lower ymodel_lower xexp_lower yexp_lower] = aylorexp1;
-        xlimits = [0 0.6];
-    case 2
-        [xmodel_upper ymodel_upper xexp_upper yexp_upper xmodel_lower ymodel_lower xexp_lower yexp_lower] = aylorexp2;
-        xlimits = [0 0.3];
-    case 3
-        [xmodel_upper ymodel_upper xexp_upper yexp_upper xmodel_lower ymodel_lower xexp_lower yexp_lower] = aylorexp3;
-        xlimits = [0 0.3];
-    case 4
-        [xmodel_upper ymodel_upper xexp_upper yexp_upper xmodel_lower ymodel_lower xexp_lower yexp_lower] = aylorexp4;
-        xlimits = [0 0.3];
-    case 5
-        [xmodel_upper ymodel_upper xexp_upper yexp_upper xmodel_lower ymodel_lower xexp_lower yexp_lower] = aylorexp5;
-        xlimits = [0 0.3];
-    case 6
-        [xmodel_upper,ymodel_upper,xexp_upper,yexp_upper,xmodel_lower,ymodel_lower,xexp_lower,yexp_lower] = aylorexp6;
-        xlimits = [0 0.3];
-    otherwise
-        error('not an existing exp')
-end
-
-
-[h, d, h0, z0, zw, L, ustar, v_s, k, np, zmin, zmax, tmax, Q_LS, t0, deltstart, sigu_zw, sigw_zw, sigu_h, sigw_h, ex_h, psi_h, Ubar_h, T_Lh, T_L0, beta,x_sense] = param(exp);
-
+%% Get the experiment
+% Obtain the data requested for this experiment (1-6)
+[xmodel_upper, ymodel_upper, xexp_upper, yexp_upper, ...
+ xmodel_lower, ymodel_lower, xexp_lower, yexp_lower] = AylorData(experiment);
+% Prepare to set xlimits for plotting Aylor's data
+xlimits = [0, 0.3]; if (experiment == 1), xlimits = 2*xlimits; end
+% Obtain the corresponding parameters for this experiment
+[h, d, h0, z0, zw, L, ustar, v_s, k, np, zmin, zmax, tmax, Q_LS, t0, ...
+   deltstart, sigu_zw, sigw_zw, sigu_h, sigw_h, ex_h, psi_h, Ubar_h, ...
+   T_Lh, T_L0, beta, x_sense] = param(experiment);
 
 % CREATE SPATIAL ARRAYS FOR PARTICLE COUNTS
 % xgates and xgate_edges are defined differently than zgates and
@@ -52,31 +46,24 @@ end
 % vertical space matters.
 xgatestart = x_sense; %first xgate
 xgatedelta = x_sense/1; %space btw each xgate
-xgates = [xgatestart:xgatedelta:x_sense]; %holds the xgates, each index is for the space between the gates including the right edge
+xgates = xgatestart:xgatedelta:x_sense; %holds the xgates, each index is for the space between the gates including the right edge
 xgatenum = length(xgates);
-xgate_edges = [xgatestart - xgatedelta/2:xgatedelta:x_sense+xgatedelta/2]; %for pdf histogram functions, so that "xgates" is at the midpoint btw elements in this array
-zgates = [zmin:.001:zmax] ; %holds the zgate edges, each index defines the space between the gates including the top edge
-zgatenum = length(zgates);
-zmidpoints = zgates(1:(zgatenum-1)) + diff(zgates)./2;
+xgate_edges = (xgatestart-xgatedelta/2):xgatedelta:(x_sense+xgatedelta/2); %for pdf histogram functions, so that "xgates" is at the midpoint btw elements in this array
+zgates = zmin:0.001:zmax ; %holds the zgate edges, each index defines the space between the gates including the top edge
+zgatenum = numel(zgates);
+zmidpoints = zgates(1:end-1) + diff(zgates)/2;
 zgatedelta = diff(zgates);
 
-
-runs = 5;      %run the experiment # times to get averages
-
-
+% Set up variables to plot within the loop and be updated afterwards
 xexp = xexp_lower;
 yexp = yexp_lower;
 xmodel = xmodel_lower;
 ymodel = ymodel_lower;
+plotname = {'Lower' 'Upper'};
 
-plotname = {'lower' 'upper'};
-
-
-
-for a = 1:length(h0)   %do lower first, then upper
+for a = 1:length(h0) % do lower first, then upper
     C_ls = zeros(runs,zgatenum-1);
     for b = 1:runs
-        
         %INITIALIZE CONCENTRATION COUNTS
         count_sum = zeros(xgatenum,zgatenum-1);
         overu_sum = zeros(xgatenum,zgatenum-1);
@@ -99,10 +86,7 @@ for a = 1:length(h0)   %do lower first, then upper
         deps = 0;
         ends = 0;
         
-        %CREATE ARRAYS FOR PARTICLE TRAJECTORY DATA
-        numberofrands = 10^6; 
-        M = randn(numberofrands,1); %create large array of random numbers, faster this way
-        rnd = 1; %keeps track of index of the random number (in random array M) that we're on. We should increment by 1 every time we use a number from M
+        % CREATE ARRAYS FOR PARTICLE TRAJECTORY DATA
         X = zeros(10^4,np);
         Z = zeros(10^4,np);
         T = zeros(10^4,np);
@@ -120,15 +104,17 @@ for a = 1:length(h0)   %do lower first, then upper
             t = t0;                             %initialize t to t0
             
             
-            %GET FIRST WIND STATS
-            [sigu sigw dsigu2 dsigw2 uw duw tau Ubar] = windstats(z,L,ustar,z0,k,v_s,h,d,zw, Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, beta, sigu_zw, sigw_zw);
+            % GET FIRST WIND STATS
+            [sigu, sigw, dsigu2, dsigw2, uw, duw, tau, Ubar] ...
+                = windstats(z, L, ustar, z0, k, v_s, h, d, zw, ...
+                            Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, ...
+                            beta, sigu_zw, sigw_zw);
             
             % INITIALIZE VELOCITY FLUCTATIONS (from his code)
             Correl_uw = uw/(sigu*sigw);
-            TermCorr_uw = Correl_uw*M(rnd) + (1-Correl_uw^2)^.5*M(rnd+1);
+            TermCorr_uw = Correl_uw*randn + (1-Correl_uw^2)^.5*randn;
             up = sigu*TermCorr_uw;
-            wp = sigw*M(rnd+2);
-            rnd = rnd + 3; %increment the random number count because we used 3 of them
+            wp = sigw*randn;
             
             % GET FIRST TIME INCREMENT
             dt = calc_dt(Ubar,sigu,tau);
@@ -151,18 +137,22 @@ for a = 1:length(h0)   %do lower first, then upper
             DT(1,j) = dt;
             
             % INCREMENTING PARTICLE POSITION LOOP
-            while z > zmin && z < zmax && x < (x_sense + 0.5)  %increment particles within these bounds
-                m = m+1;
-                [sigu sigw dsigu2 dsigw2 uw duw tau Ubar] = windstats(z,L,ustar,z0,k,v_s,h,d,zw, Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, beta, sigu_zw, sigw_zw);
+            while zmin < z && z < zmax && x < (x_sense + 0.5)  %increment particles within these bounds
+                m = m + 1;
+                
+                % Obtain the wind statistics
+                [sigu, sigw, dsigu2, dsigw2, uw, duw, tau, Ubar] ...
+                    = windstats(z, L, ustar, z0, k, v_s, h, d, zw, ...
+                                Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, ...
+                                beta, sigu_zw, sigw_zw);
                 
                 [a_u, a_w, b_u, b_w] = coeffs(sigu, sigw, dsigu2, dsigw2, uw, duw, tau, up, wp);
                 
-                
-                dup = a_u*dt + b_u*M(rnd)*sqrt(dt); %a_u nonturb, b_u turb
-                rnd = rnd+1;
-                dwp = a_w*dt + b_w*M(rnd)*sqrt(dt); %a_w nonturb, b_w turb
-                rnd = rnd+1;
-                
+                dXiu = randn*sqrt(dt);
+                dup = a_u*dt + b_u*dXiu; %a_u nonturb, b_u turb
+                dXiw = randn*sqrt(dt);
+                dwp = a_w*dt + b_w*dXiw; %a_w nonturb, b_w turb
+                                
                 up = up + dup;          %increment horizontal wind vel
                 u = up + Ubar;
                 wp = wp + dwp;
@@ -181,10 +171,6 @@ for a = 1:length(h0)   %do lower first, then upper
                 Z(m,numpart) = z;
                 T(m,numpart) = t;
                 DT(m,numpart) = dt;
-                
-                
-                
-                
                 
                 %% CONCENTRATION CALCULATIONS
                 x_space = int16(find((xgates-x)>= 0,1)-1); %find the index of the closest gate to the left of the x location
@@ -209,7 +195,6 @@ for a = 1:length(h0)   %do lower first, then upper
                     pdfe(ends) = z;
                 else                            %else figure out which gates the particle crossed while in air
                     
-                    
                     dir = x_space-xprev_space;
                     if dir ~= 0 %if it passed an xgate
                         if dir > 0  %if it moved forward
@@ -221,7 +206,7 @@ for a = 1:length(h0)   %do lower first, then upper
                         for l = array %cycle through indices of each gate particle passed through (l is the index of xgates)
                             travel = xgates(l) - xprev; %distance between gate that was crossed and previous x value
                             z_cross = (z-zprev)/jump*travel + zprev; %linear interpolation, find z value at which particle crossed x-gate
-                            if z_cross >= zgates(1) && z_cross < zgates(zgatenum)   %if it crossed at a height greater than the first zgate and less than the last zgate
+                            if z_cross >= zgates(1) && z_cross < zgates(end)   %if it crossed at a height greater than the first zgate and less than the last zgate
                                 u_cross = (u-uprev)/jump*travel + uprev; %linear interpolation, find horizontal vel at which particle crossed x-gate
                                 z_index = find((zgates-z_cross)>= 0, 1)-1; %index of z midpoint this particle resides in, includes lower gate
                                 count_sum(l,z_index) = count_sum(l,z_index) + 1; %sum particles that have crossed this xgate (l) at this particular height (z_index)
@@ -231,38 +216,26 @@ for a = 1:length(h0)   %do lower first, then upper
                         end
                     end
                     
-                    
-                    
-                    
                     xprev = x;
                     xprev_space = x_space;
                     zprev = z;
                     uprev = u;
                     
-                    
-                    %get more random numbers if out of them
-                    if rnd >= numberofrands-5
-                        rnd = 1;
-                        M = randn(10^6,1);
-                    end
-                    
-                    %recalculate dt and increment
+                    % Recalculate dt and increment
                     dt = calc_dt(Ubar,sigu,tau);
                     
                 end
                 
             end
             in_air = in_air + inair_numpart; %summing how many particles are still in the air at each xgate
-            
-            
         end
         
         c_raw = Q_LS./(np.*zgatedelta).*overu_sum; 
         c_ls = smoothdata(c_raw, 2, 'gaussian',500)*ustar/Q_LS;
         C_ls(b,:) = c_ls;
         
-        
     end
+    % Plotting
     stdev = std(C_ls);
     cvar = var(C_ls);
     avg = mean(C_ls);
@@ -277,14 +250,15 @@ for a = 1:length(h0)   %do lower first, then upper
     plot(xexp  ,yexp/h, '*-', 'LineWidth',2)
     yline(zw/h, '-', 'roughness sublayer');
     yline(1,'-','canopy top', 'LabelVerticalAlignment','bottom');
-    legend('mean concentration','standard dev','aylor model','aylor experim')
-    ylabel('Height/canopyheight')
-    xlabel('C*ustar/Q_{LS}')
+    legend('Mean Concentration','Standard Deviation','Aylor Model','Aylor Experiment', 'Location', 'southoutside', 'NumColumns', 2)
+    ylabel('$z/h$', 'Interpreter', 'latex') % Height to Canopy Height
+    xlabel('$C \cdot u_{\star} / Q_{LS}$', 'Interpreter', 'latex')
     xlim(xlimits);
     ylim([0 3])
     title(plotname{a})
     %set(gca, 'FontSize',20)
     
+    % Switch from lower (plotted first) to upper (plotted second)
     xexp = xexp_upper;
     yexp = yexp_upper;
     xmodel = xmodel_upper;
@@ -294,9 +268,6 @@ end
 
 %sgtitle(['Normalized concentrations - Aylor 2001 Lycopodium Experiment ', num2str(exp),'    (' ,num2str(runs), ' runs, ', num2str(np), ' particles each,  x-sense = ',num2str(x_sense), ' m)'])
 set(gcf, 'Position',  [100, 100, 1000, 600])
-set(findall(gcf,'-property','FontSize'),'FontSize',18)
+% set(findall(gcf,'-property','FontSize'),'FontSize',18)
 beep
 toc
-
-end
-

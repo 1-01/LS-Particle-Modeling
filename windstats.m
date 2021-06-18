@@ -1,4 +1,6 @@
-function [sigu sigw dsigu2 dsigw2 uw duw tau Ubar] = oldwindstats(z,L,ustar,z0,k,v_s,h,d,zw, Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, beta, sigu_zw, sigw_zw)
+function [sigu, sigw, dsigu2, dsigw2, uw, duw, tau, Ubar] ...
+    = windstats(z, L, ustar, z0, k, v_s, h, d, zw, ...
+                Ubar_h, sigu_h, sigw_h, T_Lh, T_L0, beta, sigu_zw, sigw_zw)
      
         % at canopy boundary z = h
         
