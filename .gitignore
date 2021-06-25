@@ -2,3 +2,4 @@
 *.asv
 # Ignore these directories
 docs/
+data/
