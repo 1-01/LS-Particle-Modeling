@@ -12,21 +12,17 @@ station.zNaN = NaN;
 % Give the horizontal wind speeds (m/s) and directions (deg)
 SPEED = [389,365,339,296,280,281,291,356,396,389,362,339,327,312,293,254,219,181,139,125]'/100;
 DIR   = [218,219,220,218,222,224,223,230,226,224,224,224,225,226,226,228,228,224,215,213]';
-% Convert DIR to mean the direction in which the wind is blowing (not from
-% where the wind is blowing)
-DIR = DIR + 180;
 
 % Place measured wind speed and directions into North and East components
-NORTH = SPEED.*cosd(DIR);
-EAST = SPEED.*sind(DIR);
+NORTH = SPEED.*cosd(DIR+180);
+EAST = SPEED.*sind(DIR+180);
 
 % Determine the mean direction of wind (determining downrange and
 % crossrange directions. The downrange direction is the angle MEANDIR
 % measured clockwise from North.
 MEANDIR = mean(DIR);
 % Rotate North and East components into downrange and crossrange
-DOWNWIND = NORTH.*cosd(MEANDIR) + EAST.*sind(MEANDIR);
-CROSSWIND = -NORTH.*sind(MEANDIR) + EAST.*cosd(MEANDIR);
+[DOWNWIND, CROSSWIND] = rotateWind(NORTH, EAST, MEANDIR);
 
 % Assign to station
 station.u = DOWNWIND;
@@ -62,10 +58,10 @@ station.upwp = -[135,128,122,115,109,102,81,95,85,132,138,126,114,111,106,100,85
 % u
 varustruct = interp1(station.z, station.VARu, 'spline', 'pp');
 station.dVARudz = fnder(varustruct,1);
-%v
+% v
 varvstruct = interp1(station.z, station.VARv, 'spline', 'pp');
 station.dVARvdz = fnder(varvstruct,1);
-%w
+% w
 varwstruct = interp1(station.z, station.VARw, 'spline', 'pp');
 station.dVARwdz = fnder(varwstruct,1);
 % u'w'

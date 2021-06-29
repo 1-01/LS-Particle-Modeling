@@ -138,17 +138,17 @@ V = station.V;
 W = station.W;
 
 % Interpolate the standard deviation
-STDu = interp1(station.z, station.STDu, z);
-STDv = interp1(station.z, station.STDv, z);
-STDw = interp1(station.z, station.STDw, z);
+STDu = interp1(station.z, station.STDu, z, 'spline', 'extrap');
+STDv = interp1(station.z, station.STDv, z, 'spline', 'extrap');
+STDw = interp1(station.z, station.STDw, z, 'spline', 'extrap');
 
 % Interpolate the variance
-VARu = interp1(station.z, station.VARu, z);
-VARv = interp1(station.z, station.VARv, z);
-VARw = interp1(station.z, station.VARw, z);
+VARu = STDu^2;
+VARv = STDv^2;
+VARw = STDw^2;
 
 % Interpolate the covariance
-meanupwp = interp1(station.z, station.upwp, z);
+meanupwp = interp1(station.z, station.upwp, z, 'spline', 'extrap');
 
 % Interpolate the derivative of variance
 dVARudz = ppval(station.dVARudz, z);
@@ -208,6 +208,11 @@ while true
     % Decrement the time step to obtain finer resolution in the flow
     % characteristics
     dt = 0.5*dt;
+    
+    % Check if the time step is finite (nonzero)
+    if (dt < eps)
+        error("Time step decreased to 0.")
+    end
 end
 
 % Continue evaluating the other dynamics with this time step assuming that
