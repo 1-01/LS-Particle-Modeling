@@ -1,4 +1,4 @@
-function virtualT = virtualTemperature(T, RH, p, p0)
+function virtualT = virtualTemperature(T, RH, p)
 % 
 % Matt Werner (m.werner@vt.edu) - July 1, 2021
 % 
@@ -41,10 +41,8 @@ function virtualT = virtualTemperature(T, RH, p, p0)
 % No checks
 
 %% Computation
-% Calculate the potential temperature using the standard atmosphere for
-% elevations within the troposphere
-R_over_cp_dryAir = 0.286;
-T0 = T*(p0/p)^R_over_cp_dryAir;
+% Calculate the potential temperature
+T0 = potentialTemperature(T, p);
 
 % Correct the potential temperature to account for relative humidity (i.e.
 % having moisture in the air, air that is not completely dry)
