@@ -23,7 +23,7 @@ function vs = terminalVelocity(particleDiameter, particleDensity, ...
 % 
 %   particleDensity - Particle diameter.
 %                     Size: 1-by-1 (scalar)
-%                     Units: m (meters)
+%                     Units: g/cm3 (grams per cubic centimetre)
 % 
 %    airTemperature - Air temperature.
 %                     Size: 1-by-1 (scalar)
@@ -45,8 +45,10 @@ function vs = terminalVelocity(particleDiameter, particleDensity, ...
 assert(particleDensity > airDensity, "Particle density must be greater than air density")
 
 %% Computation
-% Convert particle diameter from microns to meters
+% Convert particle diameter from microns to meters and particle density
+% from g/cm3 to kg/m3
 particleDiameter = 1e-6*particleDiameter;
+particleDensity  = 1e+3*particleDensity;
 % Surface gravity (note: independent of latitude)
 g = 9.81; % (m/s2)
 
