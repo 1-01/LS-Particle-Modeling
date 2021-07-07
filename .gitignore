@@ -1,5 +1,6 @@
 # Ignore these files
 *.asv
+*.fig
 # Ignore these directories
 docs/
 data/

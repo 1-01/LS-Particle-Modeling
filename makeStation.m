@@ -4,6 +4,11 @@
 % Make a mock station to test the LS model
 % 
 
+station.particle.diameter = 65; % micrometers
+station.particle.density = 1; % g/cm3
+station.Tsurface = 28; % Celsius
+station.psurface = 98e3; % Pascals
+
 % Station measurement elevations
 station.z = (200:-10:10)';
 % First elevation at which a -9999 (NaN) value appears

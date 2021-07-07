@@ -215,6 +215,13 @@ while true
     end
 end
 
+% Determine the particle's terminal velocity (according to the standard
+% atmosphere)
+[Tair, ~, dair] = standardAtmosphere(z, 273.15+station.Tsurface, station.psurface);
+vs = terminalVelocity(station.particle.diameter, ...
+                      station.particle.density, ...
+                      Tair, dair);
+
 % Continue evaluating the other dynamics with this time step assuming that
 % the coordinate frame is aligned with the mean direction of the wind (i.e.
 % V = 0)
@@ -226,7 +233,7 @@ dy = vp*dt;
 % z direction
 dxiw = randn*sqrt(dt);
 dwp = aw*dt + bw*dxiw;
-dz = wp*dt;
+dz = (wp - vs)*dt;
 
 % Increment the values t, (x, y, z), and (u', v', w') due to this time step
 t = t + dt;
