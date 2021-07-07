@@ -42,7 +42,7 @@ function vs = terminalVelocity(particleDiameter, particleDensity, ...
 
 %% Checks
 % Ensure that the particle density is greater than the air density
-assert(particleDensity > airDensity, "Particle density must be greater than air density")
+assert(1e3*particleDensity > airDensity, "Particle density must be greater than air density")
 
 %% Computation
 % Convert particle diameter from microns to meters and particle density
