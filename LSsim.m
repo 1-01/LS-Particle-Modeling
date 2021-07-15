@@ -7,7 +7,7 @@
 clear, clc
 makeStation
 for particles = 1:100
-    clear k x y z t up vp wp
+    clear k x y z t up vp wp T
     k = 1;
     t(1) = 0;
     x(1) = 0;
@@ -16,8 +16,9 @@ for particles = 1:100
     up(1) = interp1([station.z;0], [station.up;0], z, 'spline');
     vp(1) = interp1([station.z;0], [station.vp;0], z, 'spline');
     wp(1) = interp1([station.z;0], [station.wp;0], z, 'spline');
+    T(1) = station.Tsurface;
     while (t(k) < 200)
-        [t(k+1), x(k+1), y(k+1), z(k+1), up(k+1), vp(k+1), wp(k+1)] = LSstep(t(k), x(k), y(k), z(k), up(k), vp(k), wp(k), station);
+        [t(k+1), x(k+1), y(k+1), z(k+1), up(k+1), vp(k+1), wp(k+1), T(k+1)] = LSstep(t(k), x(k), y(k), z(k), up, vp, wp, T, station);
         if (z(k+1) <= 0)
             break
         end

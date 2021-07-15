@@ -1,4 +1,4 @@
-function [t, x, y, z, up, vp, wp] = LSstep(t, x, y, z, up, vp, wp, station)
+function [t, x, y, z, up, vp, wp, T] = LSstep(t, x, y, z, up, vp, wp, T, station)
 % 
 % Matt Werner (m.werner@vt.edu) - June 24, 2021
 % 
@@ -18,10 +18,15 @@ function [t, x, y, z, up, vp, wp] = LSstep(t, x, y, z, up, vp, wp, station)
 %                     Size: 1-by-1 (scalar)
 %                     Units: m (meters)
 % 
-%        up, vp, wp - Current velocity fluctuations of the fluid particle
-%                     at time t.
-%                     Size: 1-by-1 (scalar)
+%        up, vp, wp - Velocity fluctuations of the fluid particle from the
+%                     initial time to time t.
+%                     Size: n-by-1 (vector)
 %                     Units: m/s (meters per second)
+% 
+%                  T - Temperature of the atmosphere at the fluid particle
+%                     from the initial time to time t.
+%                     Size: n-by-1 (vector)
+%                     Units: K (Kelvin)
 % 
 %           station - Post-processed data from the measurement system
 %                     regarding statistics for the wind (as a function of
@@ -128,6 +133,11 @@ function [t, x, y, z, up, vp, wp] = LSstep(t, x, y, z, up, vp, wp, station)
 %                     Size: 1-by-1 (scalar)
 %                     Units: m/s (meters per second)
 % 
+%                  T - Future temperature of the atmosphere at the fluid
+%                     particle at time t + dt.
+%                     Size: 1-by-1 (scalar)
+%                     Units: K (Kelvin)
+% 
 
 %% No checks
 
@@ -138,47 +148,77 @@ V = station.V;
 W = station.W;
 
 % Interpolate the standard deviation
-STDu = interp1(station.z, station.STDu, z, 'spline', 'extrap');
-STDv = interp1(station.z, station.STDv, z, 'spline', 'extrap');
-STDw = interp1(station.z, station.STDw, z, 'spline', 'extrap');
+STDu = interp1([station.z(1:end-1); 0], station.STDu, z, 'pchip', 'extrap');
+STDv = interp1([station.z(1:end-1); 0], station.STDv, z, 'pchip', 'extrap');
+STDw = interp1([station.z(1:end-1); 0], station.STDw, z, 'pchip', 'extrap');
 
 % Interpolate the variance
 VARu = STDu^2;
 VARv = STDv^2;
 VARw = STDw^2;
 
-% Interpolate the covariance
-meanupwp = interp1(station.z, station.upwp, z, 'spline', 'extrap');
+% Calculate the covariance
+meanupwp = mean(up.*wp);
+if (numel(wp) > 1)
+    meanwpTp = mean(wp.*(T - mean(T)));
+else
+    meanwpTp = rand*rand;
+end
 
 % Interpolate the derivative of variance
 dVARudz = ppval(station.dVARudz, z);
 dVARvdz = ppval(station.dVARvdz, z);
 dVARwdz = ppval(station.dVARwdz, z);
 
-% Interpolate the derivative of covariance
-dmeanupwpdz = ppval(station.dupwpdz, z);
+% Calculate the derivative of covariance
+if (numel(z) < 5 || (numel(z) > 2 && z(end) == z(end-1)))
+    dmeanupwpdz = ppval(station.dupwpdz, z);
+else
+    dmeanupwpdz = (up(end) - up(end-1)) / (z(end) - z(end-1));
+end
 
 %% Computation
-tau = 1; % TEMPORARY % TEMPORARY % TEMPORARY % TEMPORARY % TEMPORARY
+% Grab the last values
+up = up(end);
+vp = vp(end);
+wp = wp(end);
+
+% Determine the particle's terminal velocity (according to the standard
+% atmosphere)
+[Tair, pair, dair] = standardAtmosphere(z, 273.15+station.Tsurface, station.psurface);
+vs = terminalVelocity(station.particle.diameter, ...
+                      station.particle.density, ...
+                      Tair, dair);
+
+% Calculate the Lagrangian time scale
+ustar = frictionVelocity(meanupwp);
+T0 = potentialTemperature(Tair, pair);
+L = ObukhovLength(ustar, T0, meanwpTp);
+cropHeight = 1;
+TL = LagrangianTimeScale(ustar, L, cropHeight, z, STDw);
+
+% Compute the local turbulent decorrelation time scale for velocity
+beta = 1.5;
+f = 1/sqrt(1 + (beta*vs/STDw)^2);
+tau = f*TL;
+
 % Compute the Langevin coefficients used for propagation for each of the
 % three directions (x, y, z)
 A = 2*(VARu*VARw - meanupwp^2);
 % x direction
-bu = 2*VARw/tau;
+bu = sqrt(2*VARw/tau);
 au = (bu^2/A)*(meanupwp*wp - VARw*up) + 0.5*dmeanupwpdz + ...
         (1/A)*(VARw*dVARudz*up*wp - meanupwp*dVARudz*wp^2 - ...
                meanupwp*dmeanupwpdz*up*wp + VARu*dmeanupwpdz*wp^2);
-           
 % y direction
 bv = bu;
 av = -0.5*bv^2*vp/VARv + 0.5*dVARvdz*vp*wp/VARv;
-
 % z direction
 bw = bu;
 aw = (bw^2/A)*(meanupwp*up - VARu*wp) + 0.5*dVARwdz + ...
         (1/A)*(VARw*dmeanupwpdz*up*wp - meanupwp*dmeanupwpdz*wp^2 - ...
                meanupwp*dVARwdz*up*wp + VARu*dVARwdz*wp^2);
-           
+
 %% Dynamics
 % Calculate the time step and estimate the change in x iteratively until
 % the Courant condition,
@@ -187,20 +227,8 @@ aw = (bw^2/A)*(meanupwp*up - VARu*wp) + 0.5*dVARwdz + ...
 % of the dynamics.
 dt = 0.01*tau;
 while true
-    % Create a random 'infinitesimal' with mean 0 and variance dt. This
-    % quantity is created with a new random number upon each iteration
-    dxiu = randn*sqrt(dt);
-    % Write the stochastic dynamics for the velocity fluctuation in the x
-    % direction
-    dup = au*dt + bu*dxiu;
-    % Write the dynamics for the particle's position in the x direction
-    % WITHOUT assigning up = up + dup since the loop will generally take
-    % more than 1 iteration to break (don't want accumulation of failed
-    % attempts)
-    dx = (up + dup + U)*dt;
-    
     % Check the Courant condition
-    if (dt < dx / (U + 3*STDu))
+    if (dt < 0.05 / (U + 3*STDu))
         % Leave the loop with this time step
         break
     end
@@ -215,12 +243,17 @@ while true
     end
 end
 
-% Determine the particle's terminal velocity (according to the standard
-% atmosphere)
-[Tair, ~, dair] = standardAtmosphere(z, 273.15+station.Tsurface, station.psurface);
-vs = terminalVelocity(station.particle.diameter, ...
-                      station.particle.density, ...
-                      Tair, dair);
+% Create a random 'infinitesimal' with mean 0 and variance dt. This
+% quantity is created with a new random number upon each iteration
+dxiu = randn*sqrt(dt);
+% Write the stochastic dynamics for the velocity fluctuation in the x
+% direction
+dup = au*dt + bu*dxiu;
+% Write the dynamics for the particle's position in the x direction
+% WITHOUT assigning up = up + dup since the loop will generally take
+% more than 1 iteration to break (don't want accumulation of failed
+% attempts)
+dx = (up + U)*dt;
 
 % Continue evaluating the other dynamics with this time step assuming that
 % the coordinate frame is aligned with the mean direction of the wind (i.e.
@@ -243,3 +276,4 @@ z = z + dz;
 up = up + dup;
 vp = vp + dvp;
 wp = wp + dwp;
+T = Tair;
