@@ -17,7 +17,7 @@ function averagedData = readSODAR(file)
 % 
 % The SODAR is capable of taking periodic measurements of atmospheric
 % conditions (wind speed and direction, standard deviations, covariance,
-% etc. 
+% etc.)
 % 
 % For more information about the SODAR device, refer to its manual at...
 %  https://www.remtechinc.com/sites/default/files/2017-05/USER_MANUAL_0.pdf
@@ -32,7 +32,7 @@ function averagedData = readSODAR(file)
 % 
 %    Outputs:
 % 
-%                 ? - SODAR measurement data
+%      averagedData - SODAR measurement data
 % 
 
 %% Checks
