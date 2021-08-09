@@ -79,6 +79,11 @@ while (~feof(fid))
     line = erase(line, '"');
     % Read each line with values delimited by the comma (,)
     lineData = textscan(line, '%s %f %f %f %f %f %f %f %f', 'Delimiter', ',');
+    % Check if the time ends in a whole number. If so, append ".0" to the
+    % end.
+    if (~contains(lineData{1}{1}, '.'))
+        lineData{1}{1} = lineData{1}{1} + ".0";
+    end
     % Insert time into its own array
     TIME(k, 1) = convertCharsToStrings(lineData{1}{1});
     % Insert each element (not time) into the 
