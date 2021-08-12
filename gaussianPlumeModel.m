@@ -1,4 +1,4 @@
-function [c, maxcpos] = gaussianPlumeModel(h, u, x, y, z, stability)
+function [c, maxcpos, maxcpos1m] = gaussianPlumeModel(h, u, x, y, z, stability)
 % 
 % Matt Werner (m.werner@vt.edu) - July 30, 2021
 % 
@@ -38,6 +38,11 @@ function [c, maxcpos] = gaussianPlumeModel(h, u, x, y, z, stability)
 %                     directions, respectively, at which to evaluate the
 %                     Gaussian plume concentration.
 %                     Size: n-by-m-by-k (3D array)
+%                          ([x, y, z] = ndgrid(x, y, z)
+%                                        OR
+%                           1-by-n (x is a row vector)
+%                           1-by-1 (y is scalar - probably y = 0)
+%                           m-by-1 (z is a column vector)
 %                     Units: m (meters)
 % 
 %         stability - Stability class of the weather for determining the
@@ -67,11 +72,29 @@ function [c, maxcpos] = gaussianPlumeModel(h, u, x, y, z, stability)
 %                     Size: 1-by-3 (array)
 %                     Units: m (meters)
 % 
+%         maxcpos1m - The location of the greatest concentration nearest to
+%                     a 1 meter altitude according to the given resolution
+%                     as an (x, y, z) tuple.
+%                     Size: 1-by-3 (array)
+%                     Units: m (meters)
+% 
 
 %% Checks
 % Ensure that the effective source height and wind speed are both positive
 assert(h > 0, "Effective source height (%2.2f) must be positive scalar.", h)
 assert(u > 0, "Wind speed (%2.2f) must be positive scalar.", u)
+% Check that (x,y,z) dimensions are appropriate. No issues if they are all
+% the same size. Otherwise, x should be a row vector, y a scalar, and z a
+% column vector
+arrays3D = nan;
+if (all([size(x) == size(y), size(y) == size(z)]))
+    arrays3D = true;
+elseif ((numel(size(x)) == 2 && size(x,1) == 1 && ...
+        numel(size(y)) == 2 && isscalar(y) && ...
+        numel(size(z)) == 2 && size(z,2) == 1))
+    arrays3D = false;
+end
+assert(~isnan(arrays3D), "Invalid position dimensions (if z is 1-by-m, try z').")
 % Ensure that the stability class is valid (A - F)
 assert(length(stability) == 1 && contains('ABCDEF', stability), ...
     "Please provide a stability class (A, B, C, D, E, or F) depending on the weather conditions.")
@@ -103,21 +126,35 @@ end
 % and equation (Visscher, Eq. 2.2). Note that the emission/release rate Q
 % is set to 1, as the location, not the value, of highest concentration is
 % what's important.
-%
-% Also perform the calculation in an efficient manner. This is done by
-% utilizing (overriding) the variables already defined for the dispersion
-% parameters as the size of the objects is not expected to change.
-% > This is being done to minimize computation time in case a massive grid
-%   of (x, y, z) is requested.
-% > The resulting formula will appear to be incorrect, but it is, in fact,
-%   identical to the one provided by (2.2).
-c = 1/(2*pi*u*sigmay.*sigmaz);
-% Override the previously defined dispersion parameter (for z) since the
-% remainder of the formula uses it twice and only in the denominator
-sigmay = exp(-0.5*(y./sigmay).^2);
-sigmaz = -0.5*sigmaz.^-2;
-c = c.*sigmay.*(exp(sigmaz.*(z - h).^2) + exp(sigmaz.*(z + h).^2));
+c = (1./(2*pi*u*sigmay.*sigmaz)).*exp(-0.5*(y./sigmay).^2)...
+    .*(exp(-0.5*((z - h)./sigmaz).^2) + exp(-0.5*((z + h)./sigmaz).^2));
 
-% Determine the location of maximum concentration using its linear index
-[~, lind] = max(c, [], 'all', 'linear');
-maxcpos = [x(lind), y(lind), z(lind)];
+% Find the positions of maximum concentration throughout the field and 1
+% meter above the ground. This procedure can differ if the inputs are 3D
+% arrays or not.
+if (arrays3D)
+    % All arrays are the same size. Thus, a linear index will work.
+    % Determine the position of maximum concentration using a linear index
+    [~, lind] = max(c, [], 'all', 'linear');
+    maxcpos = [x(lind), y(lind), z(lind)];
+    % Determine the index of maximum concentration at a 1 meter elevation.
+    % Since z comes from ndgrid, only check the first element (1,1,:)
+    % because all elements in a given stack are equal, i.e. for any i,j in
+    % the stack k, (i,j,k) = (:,:,k).
+    [~, pos1m] = min(abs(z(1,1,:) - 1));
+    [~, lind1m] = max(c(:,:,pos1m), [], 'all', 'linear');
+    [row, col] = ind2sub(size(c(:,:,pos1m)), lind1m);
+    maxcpos1m = [x(row, col, pos1m), y(row, col, pos1m), z(row, col, pos1m)];
+else
+    % The concentration is an m-by-n matrix whose maximum value location
+    % at (k,i) corresponds to the positions z(k) and x(i), evaluated at the
+    % given scalar y.
+    [~, I] = max(c, [], 'all', 'linear');
+    [row, col] = ind2sub(size(c), I);
+    maxcpos = [x(col), y, z(row)];
+    % Find the index of z that is closest to 1 meter above the ground and
+    % then find the maximum concentration at this altitude
+    [~, pos1m] = min(abs(z - 1));
+    [~, ind1m] = max(c(pos1m, :));
+    maxcpos1m = [x(ind1m), y, z(pos1m)];
+end
