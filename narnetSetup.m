@@ -45,8 +45,8 @@ measurementTraining = measurementBlock(1:60);
 hold on
 plot(elapsedTimeBlock, measurementBlock, 'color', '#0072BD')
 plot(elapsedTimeTraining, measurementTraining, 'k')
-xline(elapsedTimeTraining(end), '-', 'Start NARNET');
 plot(elapsedTimePrediction, measurementPrediction, 'color', '#D95319')
+xline(elapsedTimeTraining(end), '-', 'Start NARNET');
 hold off
 xlabel("Elapsed Time $t$ [minutes]", 'interpreter', 'latex', 'FontSize', 20);
 ylabel("Wind Direction $\theta$ [deg.]", 'interpreter', 'latex', 'FontSize', 20);
