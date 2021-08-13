@@ -4,4 +4,7 @@
 *.png
 # Ignore these directories
 docs/
-data/
+data/*
+# Allow the sample data files to be stored
+!data/sample.*
+!data/dronecagestest*

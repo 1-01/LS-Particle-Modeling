@@ -41,13 +41,18 @@ function [predictions, t] = narnetWindPrediction(time, measurements, futureTime)
 % 
 %       predictions - Future values of the wind measurements predicted by
 %                     NARNET deep learning.
-%                     Size: k-by-m (vector)
+%                     Size: k-by-m (matrix)
 %                     Units: ? (SI)
+% 
+%                 t - Future values of time for which the predictions are
+%                     valid.
+%                     Size: k-by-1 (vector)
+%                     Units: min (minutes)
 % 
 
 %% Checks
-% Ensure that the first element of time is 0.
-assert(numel(time) > 0 & time(1) == 0, "Invalid start time.")
+% % Ensure that the first element of time is 0.
+% assert(numel(time) > 0 & time(1) == 0, "Invalid start time.")
 % Ensure that time is flowing forward without repeated values
 assert(all(diff(time) > 0), "Invalid time stamps.")
 % Ensure that there are many measurements as time logs
@@ -63,8 +68,6 @@ assert(futureTime > 0, "Future time must be positive.")
 for n = 1:numel(time)
     T{1,n} = measurements(n, :)';
 end
-
-% T = simplenar_dataset;
 
 % Determine how much time that a single increase in the index corresponds
 % to. Note that this value cannot be zero since the initial check has
@@ -103,7 +106,8 @@ net = train(net,Xs,Ts,Xi,Ai);
 % input states Xi, and initial layer states Ai.
 [Y,Xf,Af] = net(Xs,Xi,Ai);
 % Calculate the network performance.
-perf = perform(net,Ts,Y)
+perf = perform(net,Ts,Y);
+fprintf("Network performance: %2.7f\n\n", perf)
 
 % To predict the output for the next 20 time steps, first simulate the
 % network in closed-loop mode. The final input states Xf and layer states
@@ -118,4 +122,31 @@ perf = perform(net,Ts,Y)
 % length 20. The network requires only the initial conditions given in Xic
 % and Aic.
 predictions = netc(cell(0,maxIndex),Xic,Aic);
+% Convert the predictions into a matrix in which time "flows" downwards for
+% each variable being predicted (which go across the columns)
+predictions = cell2mat(predictions)';
+
+% Provide the times at which these predictions apply. Times should be
+% linearly spaced according to the timestep dt but also have the same
+% number of elements as the prediction.
 t = time(end)+dt:dt:time(end)+futureTime;
+% Ensure that the time and prediction have the same number of elements
+if (numel(t) ~= numel(predictions))
+    % Make them equal by adding more or less timesteps. The amount of steps
+    % added or taken away should be small, as in O(1).
+    sizeDifference = numel(predictions) - numel(t);
+    if (sizeDifference > 0)
+        % Predictions has more elements than t. Therefore, add elements to
+        % t.
+        for i = 1:sizeDifference
+            t(end + 1) = t(end) + dt;
+        end
+    else
+        % Predictions has less elements than t. Therefore, remove elements
+        % from t.
+        t(end-sizeDifference:end) = [];
+    end
+end
+% Transpose the time so that it becomes a column vector (time flowing
+% downwards)
+t = t';
